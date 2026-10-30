@@ -102,7 +102,16 @@ export default async function AdminPage({
       </div>
 
       <div className="card">
-        <h2>By group on {formatDate(date)}</h2>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>By group on {formatDate(date)}</h2>
+          <Link
+            href="/admin/group/create"
+            className="btn ghost"
+            style={{ textDecoration: 'none', padding: '6px 14px', fontSize: '0.88rem' }}
+          >
+            + Create New SK
+          </Link>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>

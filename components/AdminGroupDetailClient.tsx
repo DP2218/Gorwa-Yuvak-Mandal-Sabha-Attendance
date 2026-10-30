@@ -112,6 +112,12 @@ export default function AdminGroupDetailClient({
   const [deleteTarget, setDeleteTarget] = useState<YuvakRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Delete whole group modal state
+  const [showDeleteGroupModal, setShowDeleteGroupModal] = useState(false);
+  const [groupDeletePassword, setGroupDeletePassword] = useState('');
+  const [groupDeleteSubmitting, setGroupDeleteSubmitting] = useState(false);
+  const [groupDeleteError, setGroupDeleteError] = useState<string | null>(null);
+
   // Duplicate mobile warning modal for inline save
   const [dupPrompt, setDupPrompt] = useState<{
     yuvakId: number;
@@ -587,6 +593,39 @@ export default function AdminGroupDetailClient({
     }
   }
 
+  // Handle Delete Entire Group
+  async function handleDeleteGroup(e: React.FormEvent) {
+    e.preventDefault();
+    if (!groupDeletePassword.trim() || groupDeleteSubmitting) return;
+
+    setGroupDeleteSubmitting(true);
+    setGroupDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/admin/groups/${group.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: groupDeletePassword.trim() }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.ok) {
+        setGroupDeleteError(data?.error || 'Failed to delete group');
+        setGroupDeleteSubmitting(false);
+        return;
+      }
+
+      showToast(`Group ${group.code} deleted permanently`);
+      setShowDeleteGroupModal(false);
+      router.push('/admin');
+      router.refresh();
+    } catch (err) {
+      setGroupDeleteError(err instanceof Error ? err.message : 'Network error. Please try again.');
+      setGroupDeleteSubmitting(false);
+    }
+  }
+
   return (
     <div className="wrap">
       {/* Back Link */}
@@ -673,29 +712,46 @@ export default function AdminGroupDetailClient({
             </div>
           </div>
 
-          {/* Date Selector */}
-          <div style={{ minWidth: 200 }}>
-            <label htmlFor="sabhaDateSelect" style={{ fontSize: '0.85rem' }}>
-              Sabha Date:
-            </label>
-            <select
-              id="sabhaDateSelect"
-              value={date}
-              onChange={(e) => {
-                const newDate = e.target.value;
-                if (dirtyEdits.size > 0) {
-                  if (!confirm('You have unsaved edits. Change date anyway?')) return;
-                }
-                router.push(`/admin/group/${group.id}?date=${newDate}`);
-              }}
-              style={{ fontSize: 16, minHeight: 44 }}
-            >
-              {dateOptions.map((d) => (
-                <option key={d} value={d}>
-                  {formatDate(d)}
-                </option>
-              ))}
-            </select>
+          {/* Date Selector & Delete Group */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end', minWidth: 200 }}>
+            <div style={{ width: '100%' }}>
+              <label htmlFor="sabhaDateSelect" style={{ fontSize: '0.85rem' }}>
+                Sabha Date:
+              </label>
+              <select
+                id="sabhaDateSelect"
+                value={date}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  if (dirtyEdits.size > 0) {
+                    if (!confirm('You have unsaved edits. Change date anyway?')) return;
+                  }
+                  router.push(`/admin/group/${group.id}?date=${newDate}`);
+                }}
+                style={{ fontSize: 16, minHeight: 44, width: '100%' }}
+              >
+                {dateOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {formatDate(d)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {group.code !== 'NEW' && (
+              <button
+                type="button"
+                className="btn-delete"
+                onClick={() => {
+                  setShowDeleteGroupModal(true);
+                  setGroupDeletePassword('');
+                  setGroupDeleteError(null);
+                }}
+                title={`Delete group ${group.code}`}
+                style={{ minHeight: 38, padding: '6px 12px', fontSize: '0.88rem' }}
+              >
+                🗑️ <span className="btn-delete-text">Delete Group</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1417,6 +1473,86 @@ export default function AdminGroupDetailClient({
                 Leave without saving
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Group Modal with Password Confirmation */}
+      {showDeleteGroupModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => !groupDeleteSubmitting && setShowDeleteGroupModal(false)}
+        >
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <h3 style={{ margin: '0 0 10px', color: 'var(--danger, #dc2626)' }}>
+              Delete SK Group: {group.code}
+            </h3>
+
+            <p style={{ margin: '0 0 8px', fontSize: '0.98rem' }}>
+              Are you sure you want to permanently delete <strong>{group.code}</strong>
+              {group.leader_name ? ` (Leader: ${group.leader_name})` : ''}?
+            </p>
+
+            <div
+              style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 8,
+                padding: '10px 12px',
+                marginBottom: 16,
+                color: '#991b1b',
+                fontSize: '0.88rem',
+              }}
+            >
+              ⚠️ <strong>Warning:</strong> This will permanently delete the group, all{' '}
+              <strong>{rows.length} yuvaks</strong> in it, and all their attendance history.
+              This group will also be permanently removed from future Excel downloads.
+            </div>
+
+            {groupDeleteError && (
+              <div className="error" role="alert" style={{ marginBottom: 14 }}>
+                {groupDeleteError}
+              </div>
+            )}
+
+            <form onSubmit={handleDeleteGroup}>
+              <div className="field">
+                <label htmlFor="group-delete-password-input" style={{ fontWeight: 600 }}>
+                  Enter Admin Password to confirm:
+                </label>
+                <input
+                  id="group-delete-password-input"
+                  type="password"
+                  value={groupDeletePassword}
+                  onChange={(e) => setGroupDeletePassword(e.target.value)}
+                  placeholder="Enter admin password"
+                  autoFocus
+                  required
+                  disabled={groupDeleteSubmitting}
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => setShowDeleteGroupModal(false)}
+                  disabled={groupDeleteSubmitting}
+                  style={{ minHeight: 42 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-danger"
+                  disabled={groupDeleteSubmitting || !groupDeletePassword.trim()}
+                  style={{ minHeight: 42 }}
+                >
+                  {groupDeleteSubmitting ? 'Deleting group...' : 'Delete permanently'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

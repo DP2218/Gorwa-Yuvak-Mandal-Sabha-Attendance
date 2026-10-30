@@ -141,12 +141,26 @@ export async function generateAttendanceWorkbook({
     ? groups.filter((g) => g.id === singleGroupId)
     : groups;
 
-  // Map group_id → sheet name for yuvak bucketing
-  const sheetNameByGroupId = new Map(groups.map((g) => [g.id, getSheetName(g)]));
+  // Map group_id → sheet name for yuvak bucketing, ensuring unique names <= 31 chars
+  const usedSheetNames = new Set<string>(['Master']);
+  const sheetNameByGroupId = new Map<number, string>();
+  for (const g of groups) {
+    let base = getSheetName(g);
+    let sName = base;
+    let suffix = 2;
+    while (usedSheetNames.has(sName)) {
+      sName = `${g.code}`.slice(0, 31);
+      if (usedSheetNames.has(sName)) {
+        sName = `${g.code} (${suffix++})`.slice(0, 31);
+      }
+    }
+    usedSheetNames.add(sName);
+    sheetNameByGroupId.set(g.id, sName);
+  }
 
   // Bucket yuvaks by sheet name
   const yuvaksBySheet = new Map<string, Yuvak[]>();
-  for (const g of groups) yuvaksBySheet.set(getSheetName(g), []);
+  for (const g of groups) yuvaksBySheet.set(sheetNameByGroupId.get(g.id)!, []);
   if (!yuvaksBySheet.has('New')) yuvaksBySheet.set('New', []);
 
   for (const y of yuvaks) {
@@ -159,7 +173,7 @@ export async function generateAttendanceWorkbook({
 
   // ─── 1. Group sheets ─────────────────────────────────────────────────────────
   for (const group of includedGroups) {
-    const sheetName = getSheetName(group);
+    const sheetName = sheetNameByGroupId.get(group.id) ?? getSheetName(group);
     const isNew = sheetName === 'New';
 
     const ws = wb.addWorksheet(sheetName, {

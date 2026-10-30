@@ -6,7 +6,7 @@ import AddYuvakForm from './AddYuvakForm';
 import type { Group, Yuvak } from '@/lib/data';
 
 type Props = {
-  groups: (Group & { count: number })[];
+  groups: (Group & { count: number; presentCount?: number })[];
   yuvaks: Pick<Yuvak, 'id' | 'name' | 'group_id' | 'mobile' | 'serial_no'>[];
   date: string;
 };
@@ -81,7 +81,14 @@ export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
           <Link key={g.id} href={`/group/${g.id}?date=${date}`} className="card" style={{ textDecoration: 'none', color: 'inherit', margin: 0 }}>
             <strong style={{ fontSize: '1.1rem' }}>{g.code}</strong>
             <div className="muted" style={{ marginTop: 4 }}>{g.leader_name ?? '-'}</div>
-            <div style={{ marginTop: 8 }}>{g.count} yuvaks</div>
+            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.92rem' }}>
+              <span>{g.count} yuvaks</span>
+              {g.presentCount !== undefined && (
+                <span style={{ fontWeight: 600, color: g.presentCount > 0 ? '#15803d' : 'var(--muted)' }}>
+                  {g.presentCount} present
+                </span>
+              )}
+            </div>
           </Link>
         ))}
       </div>
