@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/supabase';
 import { getAllYuvaks } from '@/lib/data';
 import { nameKey } from '@/lib/csv';
@@ -53,5 +54,12 @@ export async function POST(req: Request) {
     .select('*')
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  try {
+    revalidatePath('/', 'layout');
+  } catch {
+    // safe fallback
+  }
+
   return NextResponse.json({ yuvak: data }, { status: 201 });
 }

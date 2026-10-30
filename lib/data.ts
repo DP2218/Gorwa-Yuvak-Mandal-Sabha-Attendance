@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { db } from './supabase';
 import {
   DEFAULT_SABHA_DAY,
@@ -58,19 +59,23 @@ async function fetchAll<T>(
   return out;
 }
 
-export async function getSabhaSettings(): Promise<SabhaSettings> {
-  const { data } = await db()
-    .from('settings')
-    .select('key, value')
-    .in('key', ['sabha_day', 'date_mode', 'manual_date']);
-  const map = new Map((data ?? []).map((r) => [r.key, r.value]));
-  const sabha_day = isWeekday(map.get('sabha_day')) ? (map.get('sabha_day') as Weekday) : DEFAULT_SABHA_DAY;
-  const rawMode = map.get('date_mode');
-  const date_mode: DateMode = rawMode === 'manual' ? 'manual' : 'auto';
-  const rawManual = map.get('manual_date');
-  const manual_date = rawManual && isValidIsoDate(rawManual) ? rawManual : null;
-  return { sabha_day, date_mode, manual_date };
-}
+export const getSabhaSettings = unstable_cache(
+  async (): Promise<SabhaSettings> => {
+    const { data } = await db()
+      .from('settings')
+      .select('key, value')
+      .in('key', ['sabha_day', 'date_mode', 'manual_date']);
+    const map = new Map((data ?? []).map((r) => [r.key, r.value]));
+    const sabha_day = isWeekday(map.get('sabha_day')) ? (map.get('sabha_day') as Weekday) : DEFAULT_SABHA_DAY;
+    const rawMode = map.get('date_mode');
+    const date_mode: DateMode = rawMode === 'manual' ? 'manual' : 'auto';
+    const rawManual = map.get('manual_date');
+    const manual_date = rawManual && isValidIsoDate(rawManual) ? rawManual : null;
+    return { sabha_day, date_mode, manual_date };
+  },
+  ['sabha-settings'],
+  { tags: ['settings'], revalidate: 300 }
+);
 
 export async function setSabhaSettings(settings: {
   sabha_day: Weekday;
@@ -103,11 +108,15 @@ export async function getActiveSabhaDate(): Promise<string> {
   return mostRecentSabhaDate(settings.sabha_day, todayIST());
 }
 
-export async function getGroups(): Promise<Group[]> {
-  const { data, error } = await db().from('groups').select('*').order('sort_order');
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Group[];
-}
+export const getGroups = unstable_cache(
+  async (): Promise<Group[]> => {
+    const { data, error } = await db().from('groups').select('*').order('sort_order');
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Group[];
+  },
+  ['all-groups'],
+  { tags: ['groups'], revalidate: 300 }
+);
 
 export async function getGroupById(id: number): Promise<Group | null> {
   const { data, error } = await db().from('groups').select('*').eq('id', id).maybeSingle();
@@ -115,12 +124,37 @@ export async function getGroupById(id: number): Promise<Group | null> {
   return data as Group | null;
 }
 
-export async function getAllYuvaks(): Promise<Yuvak[]> {
-  return fetchAll<Yuvak>((from, to) =>
-    db().from('yuvaks').select('*').order('id').range(from, to) as unknown as PromiseLike<{
-      data: Yuvak[] | null; error: { message: string } | null;
-    }>
-  );
+export const getAllYuvaks = unstable_cache(
+  async (): Promise<Yuvak[]> => {
+    return fetchAll<Yuvak>((from, to) =>
+      db().from('yuvaks').select('*').order('id').range(from, to) as unknown as PromiseLike<{
+        data: Yuvak[] | null; error: { message: string } | null;
+      }>
+    );
+  },
+  ['all-yuvaks'],
+  { tags: ['yuvaks'], revalidate: 120 }
+);
+
+export async function getYuvaksByGroup(groupId: number): Promise<Yuvak[]> {
+  const { data, error } = await db()
+    .from('yuvaks')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('serial_no', { nullsFirst: false })
+    .order('name');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Yuvak[];
+}
+
+export async function getHeldSabhaDatesCount(year: number): Promise<number> {
+  const { data, error } = await db()
+    .from('attendance')
+    .select('session_date')
+    .gte('session_date', `${year}-01-01`)
+    .lte('session_date', `${year}-12-31`);
+  if (error || !data) return 0;
+  return new Set(data.map((r) => r.session_date)).size;
 }
 
 export async function getAttendanceForDate(date: string): Promise<Set<number>> {

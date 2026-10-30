@@ -16,17 +16,32 @@
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Gujarati", "Noto Sans Devanagari", sans-serif;
-  font-size: 16px; line-height: 1.45; min-height: 100vh; overflow-x: hidden;
+  font-size: 16px; line-height: 1.45; min-height: 100vh; overflow-x: clip;
 }
 a { color: var(--accent); }
 h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
 h2 { font-size: 1.15rem; margin: 0 0 .5rem; }
 .wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
 .muted { color: var(--muted); font-size: .9rem; }
-.topbar { background: var(--ink); color: #fff; }
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
 .topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; padding-bottom: 12px; }
 .topbar a { color: #fff; text-decoration: none; font-weight: 600; }
-.topbar nav { display: flex; gap: 16px; font-size: .95rem; }
+.topbar nav { display: flex; align-items: center; gap: 12px; font-size: 1rem; }
+.topbar nav a {
+  padding: 8px 14px;
+  border-radius: 8px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.topbar nav a:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
 .brand-link { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; }
 .brand-logo {
   width: 44px;
@@ -120,30 +135,54 @@ th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: 
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding-top: 6px;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
   }
   .topbar nav a {
     white-space: nowrap;
-    padding: 6px 12px;
+    padding: 10px 16px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    font-size: 0.86rem;
-    font-weight: 500;
+    background: rgba(255, 255, 255, 0.14);
+    font-size: 0.98rem;
+    font-weight: 600;
     text-align: center;
     flex: 1;
-    transition: background 0.15s ease;
+    transition: background 0.15s ease, transform 0.1s ease;
   }
   .topbar nav a:hover,
   .topbar nav a:focus-visible {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
+  }
+  .topbar nav a:active {
+    transform: scale(0.98);
   }
 }
 @media (max-width: 390px) {
   .brand-title { font-size: 0.98rem; }
   .brand-logo { width: 34px; height: 34px; }
-  .topbar nav a { font-size: 0.82rem; padding: 5px 8px; }
+  .topbar nav { gap: 8px; }
+  .topbar nav a {
+    min-height: 42px;
+    padding: 9px 10px;
+    font-size: 0.92rem;
+  }
+}
+
+/* Skeleton loading shimmer */
+@keyframes shimmer {
+  0% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+  100% { opacity: 0.55; }
+}
+.skeleton {
+  background: #e8e5dc;
+  border-radius: 8px;
+  animation: shimmer 1.3s ease-in-out infinite;
 }
 
 /* Actions column & Delete button */

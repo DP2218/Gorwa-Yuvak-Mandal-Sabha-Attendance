@@ -2,18 +2,15 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdmin } from '@/lib/auth';
 import {
-  getActiveSabhaDate,
   getAllYuvaks,
   getAttendanceForDate,
-  getAttendanceForYear,
   getGroups,
+  getHeldSabhaDatesCount,
   getSabhaSettings,
 } from '@/lib/data';
-import { formatDate, isValidIsoDate, sabhaDates, todayIST } from '@/lib/dates';
+import { formatDate, isValidIsoDate, mostRecentSabhaDate, sabhaDates, todayIST } from '@/lib/dates';
 import { LogoutButton, SabhaDayForm } from '@/components/AdminControls';
 import AdminDownloads from '@/components/AdminDownloads';
-
-export const dynamic = 'force-dynamic';
 
 export default async function AdminPage({
   searchParams,
@@ -23,14 +20,17 @@ export default async function AdminPage({
   if (!(await isAdmin())) redirect('/admin/login');
   const sp = await searchParams;
 
-  const [groups, yuvaks, sabhaSettings, activeDate] = await Promise.all([
+  const [groups, yuvaks, sabhaSettings] = await Promise.all([
     getGroups(),
     getAllYuvaks(),
     getSabhaSettings(),
-    getActiveSabhaDate(),
   ]);
   const sabhaDay = sabhaSettings.sabha_day;
   const today = todayIST();
+  const activeDate = sabhaSettings.date_mode === 'manual' && sabhaSettings.manual_date
+    ? sabhaSettings.manual_date
+    : mostRecentSabhaDate(sabhaDay, today);
+
   const date = sp.date && isValidIsoDate(sp.date) ? sp.date : activeDate;
   const year = Number(date.slice(0, 4));
   const dateOptions = sabhaDates(year, sabhaDay);
@@ -38,8 +38,10 @@ export default async function AdminPage({
   if (!dateOptions.includes(activeDate)) dateOptions.push(activeDate);
   dateOptions.sort();
 
-  const [present, yearRecords] = await Promise.all([getAttendanceForDate(date), getAttendanceForYear(year)]);
-  const heldDates = new Set(yearRecords.map((r) => r.session_date)).size;
+  const [present, heldDates] = await Promise.all([
+    getAttendanceForDate(date),
+    getHeldSabhaDatesCount(year),
+  ]);
 
   const totalPresent = yuvaks.filter((y) => present.has(y.id)).length;
   const pct = yuvaks.length ? Math.round((totalPresent / yuvaks.length) * 100) : 0;
@@ -106,6 +108,7 @@ export default async function AdminPage({
           <h2 style={{ margin: 0 }}>By group on {formatDate(date)}</h2>
           <Link
             href="/admin/group/create"
+            prefetch={true}
             className="btn ghost"
             style={{ textDecoration: 'none', padding: '6px 14px', fontSize: '0.88rem' }}
           >
@@ -120,7 +123,7 @@ export default async function AdminPage({
             <tbody>
               {groupSummary.map(({ g, total, present: p }) => (
                 <tr key={g.id}>
-                  <td><Link href={`/admin/group/${g.id}?date=${date}`}>{g.code}</Link></td>
+                  <td><Link href={`/admin/group/${g.id}?date=${date}`} prefetch={true}>{g.code}</Link></td>
                   <td>{g.leader_name ?? '-'}</td>
                   <td>{p}</td>
                   <td>{total}</td>

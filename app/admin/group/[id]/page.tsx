@@ -1,16 +1,13 @@
 import { redirect, notFound } from 'next/navigation';
 import { isAdmin } from '@/lib/auth';
 import {
-  getActiveSabhaDate,
   getAllYuvaks,
   getAttendanceForDate,
   getGroups,
   getSabhaSettings,
 } from '@/lib/data';
-import { isValidIsoDate, sabhaDates } from '@/lib/dates';
+import { isValidIsoDate, mostRecentSabhaDate, sabhaDates, todayIST } from '@/lib/dates';
 import AdminGroupDetailClient from '@/components/AdminGroupDetailClient';
-
-export const dynamic = 'force-dynamic';
 
 export default async function AdminGroupPage({
   params,
@@ -29,17 +26,19 @@ export default async function AdminGroupPage({
 
   const sp = await searchParams;
 
-  const [groups, allYuvaks, sabhaSettings, activeDate] = await Promise.all([
+  const [groups, allYuvaks, sabhaSettings] = await Promise.all([
     getGroups(),
     getAllYuvaks(),
     getSabhaSettings(),
-    getActiveSabhaDate(),
   ]);
 
   const group = groups.find((g) => g.id === groupId);
   if (!group) notFound();
 
   const sabhaDay = sabhaSettings.sabha_day;
+  const activeDate = sabhaSettings.date_mode === 'manual' && sabhaSettings.manual_date
+    ? sabhaSettings.manual_date
+    : mostRecentSabhaDate(sabhaDay, todayIST());
   const date = sp.date && isValidIsoDate(sp.date) ? sp.date : activeDate;
   const year = Number(date.slice(0, 4));
 

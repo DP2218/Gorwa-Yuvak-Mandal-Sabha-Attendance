@@ -1,17 +1,19 @@
 import HomeClient from '@/components/HomeClient';
-import { getActiveSabhaDate, getAllYuvaks, getAttendanceForDate, getGroups, getSabhaDay } from '@/lib/data';
-import { formatDate, WEEKDAYS } from '@/lib/dates';
-
-export const dynamic = 'force-dynamic';
+import { getAllYuvaks, getAttendanceForDate, getGroups, getSabhaSettings } from '@/lib/data';
+import { formatDate, mostRecentSabhaDate, todayIST, WEEKDAYS } from '@/lib/dates';
 
 export default async function HomePage() {
-  const [groups, yuvaks, sabhaDay, activeDate] = await Promise.all([
+  const [groups, yuvaks, settings] = await Promise.all([
     getGroups(),
     getAllYuvaks(),
-    getSabhaDay(),
-    getActiveSabhaDate(),
+    getSabhaSettings(),
   ]);
-  const date = activeDate;
+
+  const sabhaDay = settings.sabha_day;
+  const date = settings.date_mode === 'manual' && settings.manual_date
+    ? settings.manual_date
+    : mostRecentSabhaDate(sabhaDay, todayIST());
+
   const present = await getAttendanceForDate(date);
   const totalPresent = yuvaks.filter((y) => present.has(y.id)).length;
   const pct = yuvaks.length ? Math.round((totalPresent / yuvaks.length) * 100) : 0;

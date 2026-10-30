@@ -40,7 +40,7 @@ export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
             {results.map((y) => {
               const g = groupById.get(y.group_id ?? -1);
               return (
-                <Link key={y.id} href={`/group/${y.group_id}?date=${date}&focus=${y.id}`} className="yrow" style={{ textDecoration: 'none' }}>
+                <Link key={y.id} href={`/group/${y.group_id}?date=${date}&focus=${y.id}`} prefetch={true} className="yrow" style={{ textDecoration: 'none' }}>
                   <span style={{ minWidth: 0 }}>
                     <span className="name">{y.name}</span>
                     <span className="meta">{g ? `${g.code}` : 'No group'} {y.mobile ? `· ${y.mobile}` : ''}</span>
@@ -78,7 +78,7 @@ export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
       <h2 style={{ margin: '20px 0 10px' }}>Groups</h2>
       <div className="grid">
         {groups.map((g) => (
-          <Link key={g.id} href={`/group/${g.id}?date=${date}`} className="card" style={{ textDecoration: 'none', color: 'inherit', margin: 0 }}>
+          <Link key={g.id} href={`/group/${g.id}?date=${date}`} prefetch={true} className="card" style={{ textDecoration: 'none', color: 'inherit', margin: 0 }}>
             <strong style={{ fontSize: '1.1rem' }}>{g.code}</strong>
             <div className="muted" style={{ marginTop: 4 }}>{g.leader_name ?? '-'}</div>
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.92rem' }}>

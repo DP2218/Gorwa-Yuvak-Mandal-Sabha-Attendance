@@ -1,10 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import MarkClient from '@/components/MarkClient';
-import { getActiveSabhaDate, getAllYuvaks, getAttendanceForDate, getGroups, getSabhaDay } from '@/lib/data';
-import { formatDate, isValidIsoDate, sabhaDates, todayIST } from '@/lib/dates';
-
-export const dynamic = 'force-dynamic';
+import { getAttendanceForDate, getGroups, getSabhaSettings, getYuvaksByGroup } from '@/lib/data';
+import { formatDate, isValidIsoDate, mostRecentSabhaDate, sabhaDates, todayIST } from '@/lib/dates';
 
 export default async function GroupPage({
   params,
@@ -16,16 +14,19 @@ export default async function GroupPage({
   const { id } = await params;
   const sp = await searchParams;
   const groupId = Number(id);
-  const [groups, sabhaDay, allYuvaks, activeDate] = await Promise.all([
+
+  const [groups, settings] = await Promise.all([
     getGroups(),
-    getSabhaDay(),
-    getAllYuvaks(),
-    getActiveSabhaDate(),
+    getSabhaSettings(),
   ]);
   const group = groups.find((g) => g.id === groupId);
   if (!group) notFound();
 
-  const today = todayIST();
+  const sabhaDay = settings.sabha_day;
+  const activeDate = settings.date_mode === 'manual' && settings.manual_date
+    ? settings.manual_date
+    : mostRecentSabhaDate(sabhaDay, todayIST());
+
   const date = sp.date && isValidIsoDate(sp.date) ? sp.date : activeDate;
   const year = Number(date.slice(0, 4));
   const options = sabhaDates(year, sabhaDay);
@@ -35,13 +36,13 @@ export default async function GroupPage({
 
   const [present, yuvaks] = await Promise.all([
     getAttendanceForDate(date),
-    Promise.resolve(allYuvaks.filter((y) => y.group_id === groupId)),
+    getYuvaksByGroup(groupId),
   ]);
   const focus = sp.focus ? Number(sp.focus) : undefined;
 
   return (
     <div className="wrap">
-      <div style={{ margin: '0 0 4px' }}><Link href="/" className="back-link">← All groups</Link></div>
+      <div style={{ margin: '0 0 4px' }}><Link href="/" prefetch={true} className="back-link">← All groups</Link></div>
       <h1>{group.code}</h1>
       <p className="muted" style={{ marginTop: 0 }}>
         {group.leader_name ? `Leader: ${group.leader_name}` : 'No leader listed'}

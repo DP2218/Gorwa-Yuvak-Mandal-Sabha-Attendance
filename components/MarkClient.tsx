@@ -20,6 +20,7 @@ export default function MarkClient({ groupId, groupCode, yuvaks: initial, presen
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [addedNote, setAddedNote] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const visible = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -51,6 +52,7 @@ export default function MarkClient({ groupId, groupCode, yuvaks: initial, presen
   async function toggle(y: Yuvak) {
     const next = !present.has(y.id);
     setError(null);
+    setSaveStatus('saving');
     // Optimistic: flip immediately, roll back if the server refuses
     setPresent((prev) => {
       const n = new Set(prev);
@@ -60,12 +62,14 @@ export default function MarkClient({ groupId, groupCode, yuvaks: initial, presen
     try {
       const ok = await save(y.id, next);
       if (!ok) throw new Error('save failed');
+      setSaveStatus('saved');
     } catch {
       setPresent((prev) => {
         const n = new Set(prev);
         if (next) n.delete(y.id); else n.add(y.id);
         return n;
       });
+      setSaveStatus('idle');
       setError(`Could not save ${y.name}. Check the connection and tap again.`);
     }
   }
@@ -85,12 +89,31 @@ export default function MarkClient({ groupId, groupCode, yuvaks: initial, presen
   return (
     <>
       <div className="card">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
           <div>
             <strong style={{ fontSize: '1.4rem' }}>{presentCount}</strong>
             <span className="muted"> present of {list.length}</span>
           </div>
-          <span className="muted">Tap a name to mark present. Tap again to undo.</span>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.86rem',
+              fontWeight: 600,
+              padding: '4px 12px',
+              borderRadius: 20,
+              background: saveStatus === 'saving' ? '#fef3c7' : '#dcfce7',
+              color: saveStatus === 'saving' ? '#b45309' : '#15803d',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span>{saveStatus === 'saving' ? '⏳' : '✓'}</span>
+            <span>{saveStatus === 'saving' ? 'Saving...' : 'Auto-saved'}</span>
+          </div>
+        </div>
+        <div className="muted" style={{ fontSize: '0.85rem', marginTop: 8 }}>
+          Tap a name to mark present or absent. Each selection is <strong>saved automatically</strong> to the database — no submit button needed.
         </div>
       </div>
 
