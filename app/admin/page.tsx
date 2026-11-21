@@ -1,16 +1,13 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdmin } from '@/lib/auth';
 import {
-  getAllYuvaks,
-  getAttendanceForDate,
-  getGroups,
-  getHeldSabhaDatesCount,
+  getDashboardData,
   getSabhaSettings,
 } from '@/lib/data';
 import { formatDate, isValidIsoDate, mostRecentSabhaDate, sabhaDates, todayIST } from '@/lib/dates';
 import { LogoutButton, SabhaDayForm } from '@/components/AdminControls';
 import AdminDownloads from '@/components/AdminDownloads';
+import AdminDashboardLive from '@/components/AdminDashboardLive';
 
 export default async function AdminPage({
   searchParams,
@@ -20,11 +17,7 @@ export default async function AdminPage({
   if (!(await isAdmin())) redirect('/admin/login');
   const sp = await searchParams;
 
-  const [groups, yuvaks, sabhaSettings] = await Promise.all([
-    getGroups(),
-    getAllYuvaks(),
-    getSabhaSettings(),
-  ]);
+  const sabhaSettings = await getSabhaSettings();
   const sabhaDay = sabhaSettings.sabha_day;
   const today = todayIST();
   const activeDate = sabhaSettings.date_mode === 'manual' && sabhaSettings.manual_date
@@ -38,17 +31,15 @@ export default async function AdminPage({
   if (!dateOptions.includes(activeDate)) dateOptions.push(activeDate);
   dateOptions.sort();
 
-  const [present, heldDates] = await Promise.all([
-    getAttendanceForDate(date),
-    getHeldSabhaDatesCount(year),
-  ]);
-
-  const totalPresent = yuvaks.filter((y) => present.has(y.id)).length;
-  const pct = yuvaks.length ? Math.round((totalPresent / yuvaks.length) * 100) : 0;
-  const groupSummary = groups.map((g) => {
-    const members = yuvaks.filter((y) => y.group_id === g.id);
-    return { g, total: members.length, present: members.filter((y) => present.has(y.id)).length };
-  });
+  // Parallel server fetch of real present/absent data so page arrives pre-filled on first paint
+  const {
+    groups,
+    totalPresent,
+    totalYuvaks,
+    pct,
+    heldDates,
+    groupSummary,
+  } = await getDashboardData(date, year);
 
   return (
     <div className="wrap">
@@ -82,13 +73,19 @@ export default async function AdminPage({
         <button className="btn ghost" type="submit">Show</button>
       </form>
 
-      <div className="stats">
-        <div className="stat"><span className="muted">Date</span><b style={{ fontSize: '1.1rem' }}>{formatDate(date)}</b></div>
-        <div className="stat"><span className="muted">Present</span><b>{totalPresent}</b></div>
-        <div className="stat"><span className="muted">Yuvaks in list</span><b>{yuvaks.length}</b></div>
-        <div className="stat"><span className="muted">Attendance</span><b>{pct}%</b></div>
-        <div className="stat"><span className="muted">Sabha dates with attendance in {year}</span><b>{heldDates}</b></div>
-      </div>
+      {/* Live dashboard stats & group breakdown with SSR first paint and quiet background auto-refresh */}
+      <AdminDashboardLive
+        date={date}
+        formattedDate={formatDate(date)}
+        year={year}
+        initialStats={{
+          totalPresent,
+          totalYuvaks,
+          pct,
+          heldDates,
+        }}
+        initialGroupSummary={groupSummary}
+      />
 
       <div className="card">
         <h2>Downloads (open in Excel)</h2>
@@ -101,38 +98,6 @@ export default async function AdminPage({
           csvDateHref={`/api/admin/export?date=${date}`}
           csvYearHref={`/api/admin/export?year=${year}`}
         />
-      </div>
-
-      <div className="card">
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>By group on {formatDate(date)}</h2>
-          <Link
-            href="/admin/group/create"
-            prefetch={true}
-            className="btn ghost"
-            style={{ textDecoration: 'none', padding: '6px 14px', fontSize: '0.88rem' }}
-          >
-            + Create New SK
-          </Link>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Group</th><th>Leader</th><th>Present</th><th>In list</th><th>%</th></tr>
-            </thead>
-            <tbody>
-              {groupSummary.map(({ g, total, present: p }) => (
-                <tr key={g.id}>
-                  <td><Link href={`/admin/group/${g.id}?date=${date}`} prefetch={true}>{g.code}</Link></td>
-                  <td>{g.leader_name ?? '-'}</td>
-                  <td>{p}</td>
-                  <td>{total}</td>
-                  <td>{total ? Math.round((p / total) * 100) : 0}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   );

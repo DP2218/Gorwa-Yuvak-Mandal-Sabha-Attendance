@@ -3,6 +3,9 @@ import { db } from '@/lib/supabase';
 import { isValidIsoDate } from '@/lib/dates';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+// Run close to Supabase DB region (Mumbai/Singapore)
+export const preferredRegion = ['bom1', 'sin1'];
 
 // POST { yuvak_id, session_date: "YYYY-MM-DD", present: boolean }
 export async function POST(req: Request) {
@@ -13,18 +16,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid yuvak or date' }, { status: 400 });
   }
 
+  // Single fast statement: no extra SELECT before upsert/delete
   if (body?.present === true) {
     const { error } = await db()
       .from('attendance')
-      .upsert({ session_date: date, yuvak_id: yuvakId }, { onConflict: 'session_date,yuvak_id', ignoreDuplicates: true });
+      .upsert(
+        { session_date: date, yuvak_id: yuvakId },
+        { onConflict: 'yuvak_id,session_date', ignoreDuplicates: true }
+      );
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   } else {
     const { error } = await db()
       .from('attendance')
       .delete()
-      .eq('session_date', date)
-      .eq('yuvak_id', yuvakId);
+      .match({ session_date: date, yuvak_id: yuvakId });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, yuvak_id: yuvakId, present: body?.present === true });
 }
+

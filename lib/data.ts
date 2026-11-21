@@ -188,3 +188,50 @@ export async function getAttendanceForRange(from: string, to: string): Promise<{
   );
 }
 
+export type GroupSummaryItem = {
+  g: Group;
+  total: number;
+  present: number;
+};
+
+export async function getDashboardData(date: string, year: number) {
+  const [groups, yuvaks, presentIds, heldDates] = await Promise.all([
+    getGroups(),
+    getAllYuvaks(),
+    getAttendanceForDate(date),
+    getHeldSabhaDatesCount(year),
+  ]);
+
+  const groupMembersCount = new Map<number, number>();
+  const groupPresentCount = new Map<number, number>();
+
+  for (const y of yuvaks) {
+    if (y.group_id) {
+      groupMembersCount.set(y.group_id, (groupMembersCount.get(y.group_id) ?? 0) + 1);
+      if (presentIds.has(y.id)) {
+        groupPresentCount.set(y.group_id, (groupPresentCount.get(y.group_id) ?? 0) + 1);
+      }
+    }
+  }
+
+  const totalYuvaks = yuvaks.length;
+  const totalPresent = yuvaks.filter((y) => presentIds.has(y.id)).length;
+  const pct = totalYuvaks ? Math.round((totalPresent / totalYuvaks) * 100) : 0;
+
+  const groupSummary: GroupSummaryItem[] = groups.map((g) => ({
+    g,
+    total: groupMembersCount.get(g.id) ?? 0,
+    present: groupPresentCount.get(g.id) ?? 0,
+  }));
+
+  return {
+    groups,
+    yuvaks,
+    totalPresent,
+    totalYuvaks,
+    pct,
+    heldDates,
+    groupSummary,
+  };
+}
+

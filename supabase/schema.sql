@@ -36,6 +36,7 @@ create table if not exists attendance (
   marked_at    timestamptz not null default now(),
   unique (session_date, yuvak_id)
 );
+create unique index if not exists attendance_yuvak_date_uidx on attendance(yuvak_id, session_date);
 create index if not exists attendance_date_idx on attendance(session_date);
 
 -- Key/value app settings. 'sabha_day' = the weekday of the weekly sabha (default friday).

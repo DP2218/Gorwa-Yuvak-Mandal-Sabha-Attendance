@@ -23,8 +23,8 @@ export default function LoginForm() {
         setError('Wrong password.');
         return;
       }
+      // Instant redirect straight to /admin without a second router.refresh() double-load flash
       router.replace('/admin');
-      router.refresh();
     } catch {
       setError('Network problem. Try again.');
     } finally {
