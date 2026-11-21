@@ -194,13 +194,46 @@ export type GroupSummaryItem = {
   present: number;
 };
 
+// Fast single-pass dashboard data fetch:
+// 1. Parallel execution via Promise.all
+// 2. Selects only needed columns (no heavy text columns)
+// 3. Strict 5-second timeout to prevent hanging skeletons
 export async function getDashboardData(date: string, year: number) {
-  const [groups, yuvaks, presentIds, heldDates] = await Promise.all([
-    getGroups(),
-    getAllYuvaks(),
-    getAttendanceForDate(date),
-    getHeldSabhaDatesCount(year),
+  const queryPromise = Promise.all([
+    // Groups: only columns needed for display
+    db().from('groups').select('id, code, leader_name, sort_order').order('sort_order'),
+    // Yuvaks: only id and group_id needed for counts
+    db().from('yuvaks').select('id, group_id'),
+    // Attendance: only yuvak_id for the given date
+    db().from('attendance').select('yuvak_id').eq('session_date', date),
+    // Held dates in current year
+    db()
+      .from('attendance')
+      .select('session_date')
+      .gte('session_date', `${year}-01-01`)
+      .lte('session_date', `${year}-12-31`),
   ]);
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Dashboard data query timed out after 5s')), 5000)
+  );
+
+  const [
+    { data: groupsData, error: groupsErr },
+    { data: yuvaksData, error: yuvaksErr },
+    { data: attendanceData, error: attendanceErr },
+    { data: heldDatesData, error: heldErr },
+  ] = await Promise.race([queryPromise, timeoutPromise]);
+
+  if (groupsErr) throw new Error(groupsErr.message);
+  if (yuvaksErr) throw new Error(yuvaksErr.message);
+  if (attendanceErr) throw new Error(attendanceErr.message);
+  if (heldErr) throw new Error(heldErr.message);
+
+  const groups = (groupsData ?? []) as Group[];
+  const yuvaks = (yuvaksData ?? []) as { id: number; group_id: number | null }[];
+  const presentIds = new Set((attendanceData ?? []).map((r) => r.yuvak_id));
+  const heldDates = new Set((heldDatesData ?? []).map((r) => r.session_date)).size;
 
   const groupMembersCount = new Map<number, number>();
   const groupPresentCount = new Map<number, number>();
@@ -226,7 +259,6 @@ export async function getDashboardData(date: string, year: number) {
 
   return {
     groups,
-    yuvaks,
     totalPresent,
     totalYuvaks,
     pct,
