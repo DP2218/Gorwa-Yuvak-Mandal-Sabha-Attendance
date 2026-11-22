@@ -74,8 +74,18 @@ export default function HomeClient({
     }
   };
 
-  // Automatically refresh whenever user returns to the tab or navigates back from a group page
+  // Automatically refresh on mount, periodically every 15s, and whenever user returns to the tab
   useEffect(() => {
+    // Initial fetch on mount ensures fresh numbers when navigating back from group page
+    refreshData();
+
+    // 15-second background polling keeps all phone screens in sync
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        refreshData();
+      }
+    }, 15000);
+
     const onFocusOrVisible = () => {
       if (typeof document !== 'undefined' && !document.hidden) {
         refreshData();
@@ -83,7 +93,9 @@ export default function HomeClient({
     };
     document.addEventListener('visibilitychange', onFocusOrVisible);
     window.addEventListener('focus', onFocusOrVisible);
+
     return () => {
+      clearInterval(interval);
       document.removeEventListener('visibilitychange', onFocusOrVisible);
       window.removeEventListener('focus', onFocusOrVisible);
     };

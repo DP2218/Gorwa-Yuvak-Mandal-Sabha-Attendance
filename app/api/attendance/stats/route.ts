@@ -30,8 +30,13 @@ export async function GET(req: Request) {
 
     const groupPresentCounts: Record<number, number> = {};
     for (const y of yuvaks) {
-      if (y.group_id && presentSet.has(y.id)) {
-        groupPresentCounts[y.group_id] = (groupPresentCounts[y.group_id] ?? 0) + 1;
+      if (y.group_id) {
+        if (!(y.group_id in groupPresentCounts)) {
+          groupPresentCounts[y.group_id] = 0;
+        }
+        if (presentSet.has(y.id)) {
+          groupPresentCounts[y.group_id] += 1;
+        }
       }
     }
 

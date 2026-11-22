@@ -4,6 +4,11 @@ import MarkClient from '@/components/MarkClient';
 import { getAttendanceForDate, getGroups, getSabhaSettings, getYuvaksByGroup } from '@/lib/data';
 import { formatDate, isValidIsoDate, mostRecentSabhaDate, sabhaDates, todayIST } from '@/lib/dates';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
+export const preferredRegion = ['bom1'];
+
 export default async function GroupPage({
   params,
   searchParams,
@@ -42,7 +47,7 @@ export default async function GroupPage({
 
   return (
     <div className="wrap">
-      <div style={{ margin: '0 0 4px' }}><Link href="/" prefetch={true} className="back-link">← All groups</Link></div>
+      <div style={{ margin: '0 0 4px' }}><Link href="/" prefetch={false} className="back-link">← All groups</Link></div>
       <h1>{group.code}</h1>
       <p className="muted" style={{ marginTop: 0 }}>
         {group.leader_name ? `Leader: ${group.leader_name}` : 'No leader listed'}

@@ -28,7 +28,7 @@ export default function Header() {
         <nav className="mobile-header-nav" aria-label="Mobile Navigation">
           <Link
             href="/"
-            prefetch={true}
+            prefetch={false}
             className={`mobile-header-btn ${!isAdmin ? 'active' : 'inactive'}`}
             aria-current={!isAdmin ? 'page' : undefined}
           >
@@ -39,7 +39,7 @@ export default function Header() {
           </Link>
           <Link
             href="/admin"
-            prefetch={true}
+            prefetch={false}
             className={`mobile-header-btn ${isAdmin ? 'active' : 'inactive'}`}
             aria-current={isAdmin ? 'page' : undefined}
           >
@@ -62,7 +62,7 @@ export default function Header() {
       {/* Desktop Website Topbar: visible only on desktop (website view) */}
       <header className="topbar desktop-only">
         <div className="wrap topbar-wrap">
-          <Link href="/" prefetch={true} className="brand-link" aria-label="Gorwa Yuvak Mandal Attendance Home">
+          <Link href="/" prefetch={false} className="brand-link" aria-label="Gorwa Yuvak Mandal Attendance Home">
             <img
               src="/gym-logo-clean.png"
               alt="Gorwa Yuvak Mandal logo"
@@ -75,14 +75,14 @@ export default function Header() {
           <nav className="topbar-nav" aria-label="Main Navigation">
             <Link
               href="/"
-              prefetch={true}
+              prefetch={false}
               className={`nav-link ${isHome ? 'active' : ''}`}
             >
               Dashboard
             </Link>
             <Link
               href="/admin"
-              prefetch={true}
+              prefetch={false}
               className={`nav-link ${isAdmin ? 'active' : ''}`}
             >
               Admin
