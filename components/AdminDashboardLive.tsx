@@ -26,33 +26,37 @@ export default function AdminDashboardLive({
 }: Props) {
   const [stats, setStats] = useState(initialStats);
   const [groupSummary, setGroupSummary] = useState(initialGroupSummary);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const poll = async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/admin/stats?date=${encodeURIComponent(date)}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.stats) {
+          setStats(data.stats);
+        }
+        if (Array.isArray(data?.groupSummary)) {
+          setGroupSummary(data.groupSummary);
+        }
+      }
+    } catch {
+      // Quiet background polling
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    let isMounted = true;
-
-    const poll = async () => {
-      // Quiet background refresh - skip if tab is in background
-      if (typeof document !== 'undefined' && document.hidden) return;
-      try {
-        const res = await fetch(`/api/admin/stats?date=${encodeURIComponent(date)}`, {
-          cache: 'no-store',
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          if (data?.stats) {
-            setStats(data.stats);
-          }
-          if (Array.isArray(data?.groupSummary)) {
-            setGroupSummary(data.groupSummary);
-          }
-        }
-      } catch {
-        // Quiet background polling: quietly ignore network errors without interrupting UI
-      }
-    };
-
     // Quiet refresh every 20 seconds
-    const interval = setInterval(poll, 20000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        poll();
+      }
+    }, 20000);
 
     const onVisibilityChange = () => {
       if (!document.hidden) poll();
@@ -60,7 +64,6 @@ export default function AdminDashboardLive({
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
-      isMounted = false;
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
@@ -68,6 +71,33 @@ export default function AdminDashboardLive({
 
   return (
     <>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 8px' }}>
+        <span className="muted" style={{ fontSize: '0.9rem' }}>Live attendance summary</span>
+        <button
+          type="button"
+          className="dashboard-refresh-btn"
+          onClick={poll}
+          disabled={refreshing}
+          title="Refresh dashboard stats"
+        >
+          <svg
+            className={refreshing ? 'spin-icon' : ''}
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+          </svg>
+          <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+        </button>
+      </div>
+
       <div className="stats">
         <div className="stat">
           <span className="muted">Date</span>

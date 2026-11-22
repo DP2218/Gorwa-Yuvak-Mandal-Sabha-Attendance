@@ -18,7 +18,8 @@ export function passwordMatches(input: string): boolean {
   const rawExpected = process.env.ADMIN_PASSWORD;
   if (!rawExpected) return false;
   const expected = rawExpected.trim().replace(/^["']|["']$/g, '');
-  const a = createHash('sha256').update(input).digest();
+  const cleanInput = input.trim().replace(/^["']|["']$/g, '');
+  const a = createHash('sha256').update(cleanInput).digest();
   const b = createHash('sha256').update(expected).digest();
   return timingSafeEqual(a, b);
 }

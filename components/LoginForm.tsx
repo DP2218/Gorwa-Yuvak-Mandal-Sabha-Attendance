@@ -17,14 +17,15 @@ export default function LoginForm() {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: password.trim() }),
       });
       if (!res.ok) {
         setError('Wrong password.');
         return;
       }
-      // Instant redirect straight to /admin without a second router.refresh() double-load flash
-      router.replace('/admin');
+      // Full document navigation ensures the newly set auth cookie is sent immediately
+      // and bypasses any stale Next.js client router cache on Vercel
+      window.location.href = '/admin';
     } catch {
       setError('Network problem. Try again.');
     } finally {

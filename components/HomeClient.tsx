@@ -1,22 +1,93 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AddYuvakForm from './AddYuvakForm';
 import type { Group, Yuvak } from '@/lib/data';
 
 type Props = {
+  date: string;
+  sabhaDayLabel: string;
+  formattedDate: string;
+  initialTotalPresent: number;
+  initialTotalYuvaks: number;
+  initialPct: number;
   groups: (Group & { count: number; presentCount?: number })[];
   yuvaks: Pick<Yuvak, 'id' | 'name' | 'group_id' | 'mobile' | 'serial_no'>[];
-  date: string;
 };
 
-export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
-  const [list, setList] = useState(initial);
+export default function HomeClient({
+  date,
+  sabhaDayLabel,
+  formattedDate,
+  initialTotalPresent,
+  initialTotalYuvaks,
+  initialPct,
+  groups: initialGroups,
+  yuvaks: initialYuvaks,
+}: Props) {
+  const [list, setList] = useState(initialYuvaks);
   const [q, setQ] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
-  const groupById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
+
+  // Live dynamic attendance stats
+  const [totalPresent, setTotalPresent] = useState(initialTotalPresent);
+  const [totalYuvaks, setTotalYuvaks] = useState(initialTotalYuvaks);
+  const [pct, setPct] = useState(initialPct);
+  const [groupList, setGroupList] = useState(initialGroups);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const groupById = useMemo(() => new Map(groupList.map((g) => [g.id, g])), [groupList]);
+
+  // Live refresh function to update attendance numbers on demand
+  const refreshData = async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/attendance/stats?date=${encodeURIComponent(date)}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.totalPresent === 'number') {
+          setTotalPresent(data.totalPresent);
+        }
+        if (typeof data.totalYuvaks === 'number') {
+          setTotalYuvaks(data.totalYuvaks);
+        }
+        if (typeof data.pct === 'number') {
+          setPct(data.pct);
+        }
+        if (data.groupPresentCounts) {
+          setGroupList((prev) =>
+            prev.map((g) => ({
+              ...g,
+              presentCount: data.groupPresentCounts[g.id] ?? 0,
+            }))
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Failed to refresh dashboard counts:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Automatically refresh whenever user returns to the tab or navigates back from a group page
+  useEffect(() => {
+    const onFocusOrVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        refreshData();
+      }
+    };
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+    window.addEventListener('focus', onFocusOrVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+      window.removeEventListener('focus', onFocusOrVisible);
+    };
+  }, [date]);
 
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -28,6 +99,140 @@ export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
 
   return (
     <>
+      {/* Desktop Sabha Attendance Card */}
+      <div className="card desktop-only">
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div>
+            <h1 style={{ margin: '0 0 6px' }}>Sabha Attendance</h1>
+            <p className="muted" style={{ margin: 0 }}>
+              Sabha day: <strong style={{ color: 'inherit' }}>{sabhaDayLabel}</strong>
+              {' · '}Marking for <strong style={{ color: 'inherit' }}>{formattedDate}</strong>
+            </p>
+          </div>
+
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'baseline',
+                gap: 6,
+                background: 'var(--card-hover, rgba(0,0,0,0.03))',
+                border: '1px solid var(--line)',
+                borderRadius: 10,
+                padding: '8px 14px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span className="muted" style={{ fontSize: '0.88rem' }}>Present:</span>
+              <strong style={{ fontSize: '1.4rem', color: 'var(--ink)' }}>{totalPresent}</strong>
+              <span className="muted" style={{ fontSize: '0.88rem' }}>of {totalYuvaks}</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted)', marginLeft: 2 }}>
+                ({pct}%)
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="dashboard-refresh-btn"
+              onClick={refreshData}
+              disabled={refreshing}
+              title="Refresh present numbers"
+            >
+              <svg
+                className={refreshing ? 'spin-icon' : ''}
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+              </svg>
+              <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+            </button>
+          </div>
+        </div>
+        <p className="muted" style={{ marginBottom: 0, marginTop: 12 }}>
+          Choose a group below, or search for a yuvak. Change the date on the group page if needed.
+        </p>
+      </div>
+
+      {/* Mobile Sabha Attendance Card (matches mockup + refresh button) */}
+      <div className="mobile-only mobile-sabha-card">
+        <div className="mobile-sabha-header">
+          <div className="mobile-icon-box" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9C5B23" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="3" ry="3" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+              <circle cx="8" cy="14" r="1.2" fill="#9C5B23" />
+              <circle cx="12" cy="14" r="1.2" fill="#9C5B23" />
+              <circle cx="16" cy="14" r="1.2" fill="#9C5B23" />
+              <circle cx="8" cy="18" r="1.2" fill="#9C5B23" />
+              <circle cx="12" cy="18" r="1.2" fill="#9C5B23" />
+            </svg>
+          </div>
+          <div className="mobile-sabha-titles">
+            <h2 className="mobile-sabha-heading">Sabha Attendance</h2>
+            <div className="mobile-sabha-info">
+              Sabha day: <strong>{sabhaDayLabel}</strong>
+            </div>
+            <div className="mobile-sabha-info">
+              Marking for <strong>{formattedDate}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="mobile-present-strip" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9C5B23" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <div className="mobile-present-content">
+              <span className="mobile-present-label">Present:</span>{' '}
+              <strong className="mobile-present-count">{totalPresent}</strong>{' '}
+              <span className="mobile-present-total">of {totalYuvaks} ({pct}%)</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="mobile-refresh-btn"
+            onClick={refreshData}
+            disabled={refreshing}
+            aria-label="Refresh attendance numbers"
+          >
+            <svg
+              className={refreshing ? 'spin-icon' : ''}
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+            </svg>
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        </div>
+
+        <p className="mobile-sabha-footer">
+          Choose a group below, or search for a yuvak. Change the date on the group page if needed.
+        </p>
+      </div>
+
       {/* Desktop Find a yuvak Card */}
       <div className="card desktop-only">
         <h2>Find a yuvak</h2>
@@ -69,7 +274,7 @@ export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
         {showAdd && (
           <div style={{ marginTop: 12 }}>
             <AddYuvakForm
-              groups={groups}
+              groups={groupList}
               initialName={q.trim()}
               onAdded={(y: Yuvak) => {
                 setList((prev) => [...prev, { id: y.id, name: y.name, group_id: y.group_id, mobile: y.mobile, serial_no: null }]);
@@ -140,7 +345,7 @@ export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
         {showAdd && (
           <div style={{ marginTop: 12 }}>
             <AddYuvakForm
-              groups={groups}
+              groups={groupList}
               initialName={q.trim()}
               onAdded={(y: Yuvak) => {
                 setList((prev) => [...prev, { id: y.id, name: y.name, group_id: y.group_id, mobile: y.mobile, serial_no: null }]);
@@ -158,7 +363,7 @@ export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
       <div className="desktop-only">
         <h2 style={{ margin: '20px 0 10px' }}>Groups</h2>
         <div className="grid">
-          {groups.map((g) => (
+          {groupList.map((g) => (
             <Link key={g.id} href={`/group/${g.id}?date=${date}`} prefetch={true} className="card" style={{ textDecoration: 'none', color: 'inherit', margin: 0 }}>
               <strong style={{ fontSize: '1.1rem' }}>{g.code}</strong>
               <div className="muted" style={{ marginTop: 4 }}>{g.leader_name ?? '-'}</div>
@@ -179,7 +384,7 @@ export default function HomeClient({ groups, yuvaks: initial, date }: Props) {
       <div className="mobile-only">
         <h2 className="mobile-groups-heading">Groups</h2>
         <div className="mobile-groups-list">
-          {groups.map((g) => {
+          {groupList.map((g) => {
             const hasPresent = (g.presentCount ?? 0) > 0;
             return (
               <Link

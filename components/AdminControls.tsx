@@ -269,15 +269,13 @@ export function SabhaDayForm({
 }
 
 export function LogoutButton() {
-  const router = useRouter();
   return (
     <button
       className="btn ghost small"
       type="button"
       onClick={async () => {
         await fetch('/api/admin/logout', { method: 'POST' });
-        router.replace('/admin/login');
-        router.refresh();
+        window.location.href = '/admin/login';
       }}
     >
       Sign out

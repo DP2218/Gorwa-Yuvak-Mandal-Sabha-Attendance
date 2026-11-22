@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/supabase';
 import { isValidIsoDate } from '@/lib/dates';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 // Run close to Supabase DB region (Mumbai/Singapore)
-export const preferredRegion = ['bom1', 'sin1'];
+export const preferredRegion = ['bom1'];
 
 // POST { yuvak_id, session_date: "YYYY-MM-DD", present: boolean }
 export async function POST(req: Request) {
@@ -32,6 +33,13 @@ export async function POST(req: Request) {
       .match({ session_date: date, yuvak_id: yuvakId });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Purge any stale cached pages so returning to dashboard or admin shows latest counts immediately
+  try {
+    revalidatePath('/', 'page');
+    revalidatePath('/admin', 'page');
+  } catch {}
+
   return NextResponse.json({ ok: true, yuvak_id: yuvakId, present: body?.present === true });
 }
 
